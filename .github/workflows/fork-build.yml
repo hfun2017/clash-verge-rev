@@ -66,31 +66,32 @@ jobs:
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
         run: |
-          pnpm tauri build --target x86_64-pc-windows-msvc --no-bundle 2>&1 | tee tauri-build.log
-          echo "=== Release directory ==="
-          ls -la src-tauri/target/x86_64-pc-windows-msvc/release/ 2>&1 | head -20
-          echo "=== NetHelper.exe ==="
-          ls -la src-tauri/target/x86_64-pc-windows-msvc/release/NetHelper.exe 2>&1 || echo "NetHelper.exe NOT FOUND"
-          echo "=== Sidecar files (prebuild output) ==="
-          ls -la src-tauri/sidecar/ 2>&1 | head -20 || echo "sidecar/ does not exist"
-          echo "=== Copying sidecar(s) next to NetHelper.exe (--no-bundle skips this) ==="
-          if [ -d src-tauri/sidecar ]; then
-            cp -v src-tauri/sidecar/nethelper-mihomo*.exe src-tauri/target/x86_64-pc-windows-msvc/release/ 2>&1 || echo "no sidecar exe found"
-            ls -la src-tauri/target/x86_64-pc-windows-msvc/release/nethelper-mihomo*.exe 2>&1 || echo "sidecar copy failed"
-          else
-            echo "ERROR: src-tauri/sidecar/ does not exist — prebuild must have failed"
-          fi
-          echo "=== Final release dir ==="
-          ls -la src-tauri/target/x86_64-pc-windows-msvc/release/ 2>&1 | head -20
+          set -x
+          pnpm tauri build --target x86_64-pc-windows-msvc --no-bundle > tauri-build.stdout 2> tauri-build.stderr
+          EC=$?
+          set +x
+          echo "exit_code=$EC"
+          echo "=== tauri-build.stdout (last 100 lines) ==="
+          tail -100 tauri-build.stdout 2>&1 || echo "no stdout"
+          echo "=== tauri-build.stderr (last 100 lines) ==="
+          tail -100 tauri-build.stderr 2>&1 || echo "no stderr"
+          echo "=== full stdout ==="
+          cat tauri-build.stdout 2>&1 || echo "no stdout"
+          echo "=== full stderr ==="
+          cat tauri-build.stderr 2>&1 || echo "no stderr"
+          exit $EC
 
-      - name: Upload artifacts
+      - name: Upload artifacts (always upload logs for debugging)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: NetHelper-windows-x64
           path: |
             src-tauri/target/x86_64-pc-windows-msvc/release/NetHelper.exe
-            tauri-build.log
-          if-no-files-found: error
+            src-tauri/target/x86_64-pc-windows-msvc/release/nethelper-mihomo*.exe
+            tauri-build.stdout
+            tauri-build.stderr
+          if-no-files-found: warn
 
   release:
     name: Publish to GitHub Release (NetHelper)
