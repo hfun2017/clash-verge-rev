@@ -51,10 +51,13 @@ jobs:
         # tool-fetch. Use the dedicated negrutiu/nsis-install action which
         # downloads and unpacks NSIS to a known location, then put the
         # installation directory on PATH so tauri build finds makensis.exe.
+        # Tauri 2 builds a 64-bit installer (x86_64-pc-windows-msvc) and
+        # needs the amd64 NSIS toolchain — the default x86 NSIS won't be
+        # found by Tauri's bundler and the bundle step is silently skipped.
         uses: negrutiu/nsis-install@v1
         with:
-          # Latest stable NSIS, native x64 build.
-          version: '3.10'
+          distro: 'negrutiu'
+          arch: 'amd64'
 
       - name: Pnpm install
         run: |
