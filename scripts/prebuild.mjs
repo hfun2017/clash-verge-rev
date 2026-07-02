@@ -175,8 +175,8 @@ const META_ALPHA_URL_PREFIX = `https://github.com/hfun2017/mihomo/releases/downl
 let META_ALPHA_VERSION
 
 const META_VERSION_URL =
-  'https://github.com/hfun2017/mihomo/releases/latest/download/version.txt'
-const META_URL_PREFIX = `https://github.com/hfun2017/mihomo/releases/download`
+  'https://github.com/hfun2017/mihomo/releases/download/Prerelease-Meta/version.txt'
+const META_URL_PREFIX = `https://github.com/hfun2017/mihomo/releases/download/Prerelease-Meta`
 let META_VERSION
 
 const META_ALPHA_MAP = {
