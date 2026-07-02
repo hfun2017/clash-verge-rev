@@ -48,14 +48,13 @@ jobs:
       - name: Install NSIS
         # Tauri 2's bundled-NSIS auto-download fails silently on the
         # windows-latest runner when GitHub's API rate limit blocks the
-        # tool-fetch. Install NSIS via choco so the bundle step is
-        # guaranteed to find it and emit src-tauri/target/.../bundle/nsis/*.exe.
-        shell: pwsh
-        run: |
-          if (-not (Get-Command makensis.exe -ErrorAction SilentlyContinue)) {
-            choco install nsis -y --no-progress
-          }
-          makensis /VERSION
+        # tool-fetch. Use the dedicated negrutiu/nsis-install action which
+        # downloads and unpacks NSIS to a known location, then put the
+        # installation directory on PATH so tauri build finds makensis.exe.
+        uses: negrutiu/nsis-install@v1
+        with:
+          # Latest stable NSIS, native x64 build.
+          version: '3.10'
 
       - name: Pnpm install
         run: |
