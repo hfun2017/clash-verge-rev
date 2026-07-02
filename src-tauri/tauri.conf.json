@@ -33,6 +33,9 @@
       "desktop": {
         "schemes": ["nethelper"]
       }
+    },
+    "updater": {
+      "active": false
     }
   },
   "app": {
