@@ -1,10 +1,20 @@
-import {
-  check,
-  type CheckOptions,
-  type Update,
-} from '@tauri-apps/plugin-updater'
-
 import { version as appVersion } from '@root/package.json'
+
+// Stub types — tauri-plugin-updater was removed; we do not auto-update the fork.
+// `checkUpdateSafe` always returns null so the UI's "check for update" button
+// gracefully reports "no update available".
+
+export type CheckOptions = Record<string, unknown>
+
+export type Update = {
+  version: string
+  rawJson?: Record<string, unknown> | null
+  close?: () => Promise<void>
+}
+
+export async function check(_options?: CheckOptions): Promise<Update | null> {
+  return null
+}
 
 export type VersionParts = {
   main: number[]
