@@ -311,7 +311,7 @@ function clashMeta() {
     targetFile: `nethelper-mihomo-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
     exeFile: `${name}${isWin ? '.exe' : ''}`,
     zipFile: `${name}-${META_VERSION}.${urlExt}`,
-    downloadURL: `${META_URL_PREFIX}/${META_VERSION}/${name}-${META_VERSION}.${urlExt}`,
+    downloadURL: `${META_URL_PREFIX}/${name}-${META_VERSION}.${urlExt}`,
   }
 }
 
