@@ -65,21 +65,25 @@ jobs:
       - name: Tauri build (no bundle)
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
+          RUST_LOG: 'tauri_bundler=trace,tauri=trace,debug'
         run: |
-          echo "PWD=$(pwd)"
-          echo "PATH=$PATH"
-          which pnpm
-          which node
-          node --version
-          pnpm --version
-          echo "=== Tauri CLI version ==="
-          pnpm tauri --version 2>&1 || echo "tauri --version failed"
-          echo "=== Tauri info (first 30 lines) ==="
-          pnpm tauri info 2>&1 | head -30 || echo "tauri info failed"
-          echo "=== Running tauri build ==="
-          pnpm tauri build --target x86_64-pc-windows-msvc --no-bundle 2>&1
+          pnpm tauri build --target x86_64-pc-windows-msvc --no-bundle --verbose > tauri-build.stdout 2> tauri-build.stderr
           EC=$?
           echo "exit_code=$EC"
+          echo "===== tauri-build.stdout (head 200) ====="
+          head -200 tauri-build.stdout 2>&1 || echo "EMPTY"
+          echo "===== tauri-build.stdout (tail 200) ====="
+          tail -200 tauri-build.stdout 2>&1 || echo "EMPTY"
+          echo "===== tauri-build.stderr (head 200) ====="
+          head -200 tauri-build.stderr 2>&1 || echo "EMPTY"
+          echo "===== tauri-build.stderr (tail 200) ====="
+          tail -200 tauri-build.stderr 2>&1 || echo "EMPTY"
+          echo "===== tauri-build.stderr line count ====="
+          wc -l tauri-build.stdout tauri-build.stderr 2>&1 || echo "EMPTY"
+          echo "===== target release dir ====="
+          ls -la src-tauri/target/x86_64-pc-windows-msvc/release/ 2>&1 | head -30 || echo "release dir missing"
+          echo "===== sidecar dir ====="
+          ls -la src-tauri/sidecar/ 2>&1 | head -10 || echo "sidecar dir missing"
           exit $EC
 
       - name: Upload artifacts (always upload logs for debugging)
