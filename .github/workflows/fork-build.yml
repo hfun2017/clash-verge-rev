@@ -63,3 +63,34 @@ jobs:
           path: |
             src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
           if-no-files-found: error
+
+  release:
+    name: Publish to GitHub Release (NetHelper)
+    needs: build-windows
+    if: success()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: NetHelper-windows-x64
+          path: release-assets/
+
+      - name: Create release with installer
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nethelper-build-${{ github.run_id }}
+          name: 'NetHelper Windows x64 (build ${{ github.run_number }})'
+          body: |
+            Custom build of NetHelper (renamed clash-verge-rev).
+
+            **Process name (mihomo kernel)**: nethelper-windows-amd64-v2.exe
+            **GUI**: NetHelper
+            **Internal app ID**: io.github.hfun2017.nethelper
+            **Mihomo fork**: https://github.com/hfun2017/mihomo
+          files: release-assets/*.exe
+          fail_on_unmatched_files: true
+          draft: false
+          prerelease: true
