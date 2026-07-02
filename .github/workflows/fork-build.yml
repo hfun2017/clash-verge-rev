@@ -52,7 +52,7 @@ jobs:
 
       - name: Tauri build
         env:
-          NODE_OPTIONS: '--max_old_space_size=4096'
+          NODE_OPTIONS: '--max-old-space-size=4096'
         run: |
           pnpm tauri build --target x86_64-pc-windows-msvc --bundles nsis
 
