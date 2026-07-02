@@ -66,19 +66,20 @@ jobs:
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
         run: |
-          set -x
-          pnpm tauri build --target x86_64-pc-windows-msvc --no-bundle > tauri-build.stdout 2> tauri-build.stderr
+          echo "PWD=$(pwd)"
+          echo "PATH=$PATH"
+          which pnpm
+          which node
+          node --version
+          pnpm --version
+          echo "=== Tauri CLI version ==="
+          pnpm tauri --version 2>&1 || echo "tauri --version failed"
+          echo "=== Tauri info (first 30 lines) ==="
+          pnpm tauri info 2>&1 | head -30 || echo "tauri info failed"
+          echo "=== Running tauri build ==="
+          pnpm tauri build --target x86_64-pc-windows-msvc --no-bundle 2>&1
           EC=$?
-          set +x
           echo "exit_code=$EC"
-          echo "=== tauri-build.stdout (last 100 lines) ==="
-          tail -100 tauri-build.stdout 2>&1 || echo "no stdout"
-          echo "=== tauri-build.stderr (last 100 lines) ==="
-          tail -100 tauri-build.stderr 2>&1 || echo "no stderr"
-          echo "=== full stdout ==="
-          cat tauri-build.stdout 2>&1 || echo "no stdout"
-          echo "=== full stderr ==="
-          cat tauri-build.stderr 2>&1 || echo "no stderr"
           exit $EC
 
       - name: Upload artifacts (always upload logs for debugging)

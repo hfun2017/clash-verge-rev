@@ -3,7 +3,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": "all",
     "longDescription": "NetHelper",
     "icon": [
       "icons/32x32.png",
