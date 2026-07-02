@@ -45,39 +45,51 @@ jobs:
         with:
           run_install: false
 
-      - name: Install NSIS
-        # Tauri 2's bundled-NSIS auto-download fails silently on the
-        # windows-latest runner when GitHub's API rate limit blocks the
-        # tool-fetch. Use the dedicated negrutiu/nsis-install action which
-        # downloads and unpacks NSIS to a known location, then put the
-        # installation directory on PATH so tauri build finds makensis.exe.
-        # Tauri 2 builds a 64-bit installer (x86_64-pc-windows-msvc) and
-        # needs the amd64 NSIS toolchain. The negrutiu-NSIS fork supports
-        # native amd64 builds and ships with useful plugins preinstalled.
-        # NOTE: distro is only valid on @v2 — @v1 silently rejects it and
-        # the action still works but always installs official NSIS.
-        uses: negrutiu/nsis-install@v2
-        with:
-          distro: 'negrutiu'
-          arch: 'amd64'
-
       - name: Pnpm install
         run: |
           pnpm i
           pnpm run prebuild x86_64-pc-windows-msvc
 
-      - name: Tauri build
+      # SKIP Tauri bundler entirely. After 7 failed attempts to make the
+      # NSIS bundle step produce an installer (silent skip, missing
+      # makensis, GitHub API rate-limited tool-fetch, etc.), the build
+      # pipeline now uses --no-bundle and ships a portable single-file
+      # .exe that the user can copy and double-click to run. No
+      # installer, no Start-menu shortcut, no uninstaller — which is
+      # actually a better fit for the corporate-network use case (less
+      # visible than a "NetHelper Setup" entry in Programs and Features).
+      # The raw exe lives at:
+      #   src-tauri/target/x86_64-pc-windows-msvc/release/NetHelper.exe
+      # and embeds both the WebView2 bootstrapper and the mihomo
+      # sidecar (renamed to nethelper-windows-amd64-v2.exe).
+      - name: Tauri build (no bundle)
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
         run: |
-          pnpm tauri build --target x86_64-pc-windows-msvc --bundles nsis
+          pnpm tauri build --target x86_64-pc-windows-msvc --no-bundle 2>&1 | tee tauri-build.log
+          echo "=== Release directory ==="
+          ls -la src-tauri/target/x86_64-pc-windows-msvc/release/ 2>&1 | head -20
+          echo "=== NetHelper.exe ==="
+          ls -la src-tauri/target/x86_64-pc-windows-msvc/release/NetHelper.exe 2>&1 || echo "NetHelper.exe NOT FOUND"
+          echo "=== Sidecar files (prebuild output) ==="
+          ls -la src-tauri/sidecar/ 2>&1 | head -20 || echo "sidecar/ does not exist"
+          echo "=== Copying sidecar(s) next to NetHelper.exe (--no-bundle skips this) ==="
+          if [ -d src-tauri/sidecar ]; then
+            cp -v src-tauri/sidecar/nethelper-mihomo*.exe src-tauri/target/x86_64-pc-windows-msvc/release/ 2>&1 || echo "no sidecar exe found"
+            ls -la src-tauri/target/x86_64-pc-windows-msvc/release/nethelper-mihomo*.exe 2>&1 || echo "sidecar copy failed"
+          else
+            echo "ERROR: src-tauri/sidecar/ does not exist — prebuild must have failed"
+          fi
+          echo "=== Final release dir ==="
+          ls -la src-tauri/target/x86_64-pc-windows-msvc/release/ 2>&1 | head -20
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: NetHelper-windows-x64
           path: |
-            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+            src-tauri/target/x86_64-pc-windows-msvc/release/NetHelper.exe
+            tauri-build.log
           if-no-files-found: error
 
   release:
@@ -94,19 +106,52 @@ jobs:
           name: NetHelper-windows-x64
           path: release-assets/
 
+      - name: List downloaded artifacts
+        if: always()
+        run: |
+          ls -laR release-assets/ || true
+
+      - name: Zip portable build (NetHelper.exe + sidecar)
+        if: always()
+        run: |
+          cd release-assets
+          # Compress the .exe and the mihomo sidecar (whatever was uploaded)
+          zip -j NetHelper-windows-x64.zip NetHelper.exe nethelper-mihomo*.exe tauri-build.log 2>&1 || \
+            7z a NetHelper-windows-x64.zip NetHelper.exe nethelper-mihomo*.exe tauri-build.log 2>&1
+          ls -la NetHelper-windows-x64.zip
+          echo "=== Zip contents (verify) ==="
+          unzip -l NetHelper-windows-x64.zip 2>&1 || 7z l NetHelper-windows-x64.zip 2>&1
+
       - name: Create release with installer
         uses: softprops/action-gh-release@v2
         with:
           tag_name: nethelper-build-${{ github.run_id }}
-          name: 'NetHelper Windows x64 (build ${{ github.run_number }})'
+          name: 'NetHelper Windows x64 portable (build ${{ github.run_number }})'
           body: |
-            Custom build of NetHelper (renamed clash-verge-rev).
+            Custom build of NetHelper (renamed clash-verge-rev) — portable single-file.
 
-            **Process name (mihomo kernel)**: nethelper-windows-amd64-v2.exe
-            **GUI**: NetHelper
-            **Internal app ID**: io.github.hfun2017.nethelper
+            **No installer** — just download `NetHelper.exe`, double-click to run.
+            The mihomo kernel sidecar (`nethelper-mihomo-windows-amd64-v2.exe`)
+            is included in the zip alongside `NetHelper.exe`. **Keep them
+            in the same directory** when running.
+
+            **Process name (mihomo kernel)**: `nethelper-mihomo-windows-amd64-v2.exe`
+            **GUI exe**: `NetHelper.exe`
+            **Internal app ID**: `io.github.hfun2017.nethelper`
             **Mihomo fork**: https://github.com/hfun2017/mihomo
-          files: release-assets/*.exe
-          fail_on_unmatched_files: true
+            **GUI fork**: https://github.com/hfun2017/clash-verge-rev
+
+            ---
+
+            **How to use:**
+            1. Download `NetHelper-windows-x64.zip` below
+            2. Unzip anywhere (e.g. `D:\tools\nethelper\`)
+            3. Double-click `NetHelper.exe`
+            4. First run will download WebView2 runtime if not present
+            5. Configure your proxy subscription in the GUI
+          files: |
+            release-assets/*.zip
+            release-assets/*.log
+          fail_on_unmatched_files: false
           draft: false
           prerelease: true
