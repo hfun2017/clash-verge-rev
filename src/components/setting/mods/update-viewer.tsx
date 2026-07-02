@@ -2,9 +2,10 @@ import { alpha, Box, Button, LinearProgress } from '@mui/material'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { open as openUrl } from '@tauri-apps/plugin-shell'
 // tauri-plugin-updater was removed from the fork. We do not auto-update.
-// Stub the type so the surrounding event-handler code type-checks.
-// (When checkUpdateSafe returns null, this handler never runs anyway.)
-type DownloadEvent = unknown
+// Use the stub DownloadEvent from src/services/update so the
+// event-handler code type-checks. (When checkUpdateSafe returns null,
+// this handler never runs anyway.)
+import type { DownloadEvent } from '@/services/update'
 import { useLockFn } from 'ahooks'
 import type { Ref } from 'react'
 import { useImperativeHandle, useMemo, useRef, useState } from 'react'
@@ -187,7 +188,7 @@ export function UpdateViewer({ ref }: { ref?: Ref<DialogRef> }) {
     }
 
     try {
-      await updateInfo.downloadAndInstall(onDownloadEvent)
+      await updateInfo.downloadAndInstall?.(onDownloadEvent)
       await relaunch()
     } catch (err: any) {
       showNotice.error(err)

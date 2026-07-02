@@ -1,16 +1,29 @@
 import { version as appVersion } from '@root/package.json'
 
 // Stub types — tauri-plugin-updater was removed; we do not auto-update the fork.
-// `checkUpdateSafe` always returns null so the UI's "check for update" button
-// gracefully reports "no update available".
+// `check` always returns null so the UI's "check for update" button gracefully
+// reports "no update available" and the download/install code paths never run.
+// The shape mirrors the upstream `Update` type so the surrounding UI code
+// type-checks against the same field set.
 
 export type CheckOptions = Record<string, unknown>
 
+// Mirrors @tauri-apps/plugin-updater Update. We never populate these, but the
+// UI reads `.available` / `.body` / calls `.downloadAndInstall(cb)` after a
+// successful check, so the stub must satisfy the same field contract.
 export type Update = {
+  available: boolean
   version: string
+  body?: string
   rawJson?: Record<string, unknown> | null
   close?: () => Promise<void>
+  downloadAndInstall?: (onEvent?: (event: DownloadEvent) => void) => Promise<void>
 }
+
+export type DownloadEvent =
+  | { event: 'Started'; data: { contentLength?: number } }
+  | { event: 'Progress'; data: { chunkLength: number } }
+  | { event: 'Finished' }
 
 export async function check(_options?: CheckOptions): Promise<Update | null> {
   return null
@@ -151,15 +164,15 @@ export const checkUpdateSafe = async (
   const comparison = compareVersions(remoteVersion, localVersionNormalized)
 
   if (comparison !== null && comparison <= 0) {
-    try {
-      await result.close()
-    } catch (err) {
-      console.warn('[updater] failed to close stale update resource', err)
+    if (result.close) {
+      try {
+        await result.close()
+      } catch (err) {
+        console.warn('[updater] failed to close stale update resource', err)
+      }
     }
     return null
   }
 
   return result
 }
-
-export type { CheckOptions }
