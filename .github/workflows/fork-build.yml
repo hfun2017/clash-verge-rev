@@ -145,27 +145,49 @@ jobs:
           tag_name: nethelper-build-${{ github.run_id }}
           name: 'NetHelper Windows x64 portable (build ${{ github.run_number }})'
           body: |
-            Custom build of NetHelper (renamed clash-verge-rev) — portable single-file.
+            NetHelper 是 [clash-verge-rev](https://github.com/clash-verge-rev/clash-verge-rev) 的改名 fork,专门用来绕过公司内网"按进程名封禁".
 
-            **No installer** — just download `NetHelper.exe`, double-click to run.
-            The mihomo kernel sidecar (`nethelper-mihomo-windows-amd64-v2.exe`)
-            is included in the zip alongside `NetHelper.exe`. **Keep them
-            in the same directory** when running.
+            ## 包含什么
 
-            **Process name (mihomo kernel)**: `nethelper-mihomo-windows-amd64-v2.exe`
-            **GUI exe**: `NetHelper.exe`
-            **Internal app ID**: `io.github.hfun2017.nethelper`
-            **Mihomo fork**: https://github.com/hfun2017/mihomo
-            **GUI fork**: https://github.com/hfun2017/clash-verge-rev
+            | 文件 | 说明 |
+            |---|---|
+            | `NetHelper.exe` | **GUI 主程序,双击运行** |
+            | `nethelper-mihomo.exe` | 改名后的 Mihomo 稳定内核 (Tauri sidecar) |
+            | `nethelper-mihomo-alpha.exe` | 改名后的 Mihomo 测试内核 (设置里可切换) |
 
-            ---
+            **重要**: 三个文件**必须放在同一目录**,不要拆开.
 
-            **How to use:**
-            1. Download `NetHelper-windows-x64.zip` below
-            2. Unzip anywhere (e.g. `D:\tools\nethelper\`)
-            3. Double-click `NetHelper.exe`
-            4. First run will download WebView2 runtime if not present
-            5. Configure your proxy subscription in the GUI
+            ## 怎么用
+
+            1. 下载下面的 `NetHelper-windows-x64.zip`
+            2. 解压到任意目录 (建议 `D:\tools\nethelper\`,**不要放 `%ProgramFiles%`**,免安装)
+            3. 双击 `NetHelper.exe`
+            4. 首次运行会下载 WebView2 runtime (如果系统没有)
+            5. 设置 → Profiles 导入你的订阅 / 配置文件
+            6. 打开系统代理或 TUN 模式
+
+            ## 关键信息
+
+            - **GUI exe 名**: `NetHelper.exe`
+            - **Mihomo 内核进程名**: `nethelper-mihomo.exe` / `nethelper-mihomo-alpha.exe`
+            - **应用内部 ID**: `io.github.hfun2017.nethelper`
+            - **配置目录**: `%APPDATA%\io.github.hfun2017.nethelper\`
+            - **没有自动更新**,新版本自己来 Release 页拿
+            - **没有安装包**,纯绿色版,删目录即卸载
+
+            ## 改了什么
+
+            - GUI: `clash-verge-rev` → `NetHelper` (产品名 / 窗口标题 / HTML title / app ID)
+            - 内核: `verge-mihomo` → `nethelper-mihomo` (stable + alpha 两个版本都改)
+            - IPC 管道: `verge-mihomo` → `nethelper`
+            - 服务辅助进程: `clash-verge-service.exe` → `nethelper-service.exe`
+
+            i18n 翻译文件里有几十处 "Clash Verge" 文案是**故意保留的** (app 内部 UI 文案,跟进程名/窗口名无关),详细见 [README](https://github.com/hfun2017/clash-verge-rev#readme).
+
+            ## 仓库
+
+            - **GUI fork**: https://github.com/hfun2017/clash-verge-rev
+            - **Mihomo 内核 fork**: https://github.com/hfun2017/mihomo
           files: |
             release-assets/*.zip
             release-assets/*.log
