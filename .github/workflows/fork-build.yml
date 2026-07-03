@@ -80,12 +80,12 @@ jobs:
             tail -200 tauri-build.stderr || echo "EMPTY"
             echo "===== tauri-build.stderr line count ====="
             wc -l tauri-build.stdout tauri-build.stderr
-            echo "===== target release dir ====="
-            ls -la src-tauri/target/x86_64-pc-windows-msvc/release/ 2>&1 | head -30 || echo "release dir missing"
             exit 1
           }
           echo "===== build OK ====="
-          ls -la src-tauri/target/x86_64-pc-windows-msvc/release/ | head -30
+          # tauri build runs from repo root, cargo target is at ./target (not ./src-tauri/target)
+          ls -la target/x86_64-pc-windows-msvc/release/ 2>&1 | head -30 || echo "ROOT target dir missing"
+          ls -la src-tauri/target/x86_64-pc-windows-msvc/release/ 2>&1 | head -30 || echo "src-tauri target dir missing"
           ls -la src-tauri/sidecar/ 2>&1 | head -10 || echo "no sidecar"
 
       - name: Upload artifacts (always upload logs for debugging)
@@ -94,9 +94,10 @@ jobs:
         with:
           name: NetHelper-windows-x64
           path: |
+            target/x86_64-pc-windows-msvc/release/NetHelper.exe
             src-tauri/target/x86_64-pc-windows-msvc/release/NetHelper.exe
             src-tauri/target/x86_64-pc-windows-msvc/release/nethelper.exe
-            src-tauri/target/x86_64-pc-windows-msvc/release/nethelper-mihomo*.exe
+            target/x86_64-pc-windows-msvc/release/nethelper-mihomo*.exe
             tauri-build.stdout
             tauri-build.stderr
           if-no-files-found: error   # hard-fail if no .exe — never silently ship a "build that built nothing"
