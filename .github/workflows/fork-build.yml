@@ -125,9 +125,16 @@ jobs:
         if: always()
         run: |
           cd release-assets
-          # Compress the .exe and the mihomo sidecar (whatever was uploaded)
-          zip -j NetHelper-windows-x64.zip NetHelper.exe nethelper-mihomo*.exe tauri-build.log 2>&1 || \
-            7z a NetHelper-windows-x64.zip NetHelper.exe nethelper-mihomo*.exe tauri-build.log 2>&1
+          # Files are at release-assets/target/x86_64-pc-windows-msvc/release/*.exe
+          # and release-assets/tauri-build.{stdout,stderr}. zip -j doesn't recurse,
+          # so we use find to collect all .exe + log files into a flat layout.
+          find target -name '*.exe' -exec cp -v {} . \;
+          cp -v tauri-build.stdout tauri-build.log 2>/dev/null || true
+          cp -v tauri-build.stderr tauri-build.log 2>/dev/null || true
+          ls -la
+          echo "=== building zip ==="
+          # Use 7z (zip on Ubuntu is sometimes missing the .exe extension support)
+          7z a -tzip NetHelper-windows-x64.zip NetHelper.exe nethelper-mihomo*.exe tauri-build.log 2>&1
           ls -la NetHelper-windows-x64.zip
           echo "=== Zip contents (verify) ==="
           unzip -l NetHelper-windows-x64.zip 2>&1 || 7z l NetHelper-windows-x64.zip 2>&1
