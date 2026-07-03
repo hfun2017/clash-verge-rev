@@ -1,11 +1,11 @@
 [package]
-name = "nethelper"
+name = "NetHelper"
 version = "2.5.2"
 description = "NetHelper"
 authors = ["zzzgydi", "Tunglies", "wonfen", "MystiPanda"]
 license = "GPL-3.0-only"
 repository = "https://github.com/hfun2017/clash-verge-rev.git"
-default-run = "nethelper"
+default-run = "NetHelper"
 build = "build.rs"
 edition = "2024"
 rust-version = "1.95"
