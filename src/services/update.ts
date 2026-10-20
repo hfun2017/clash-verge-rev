@@ -1,23 +1,19 @@
+import { compareVersions as compareSemver } from 'compare-versions'
+
 import { version as appVersion } from '@root/package.json'
 
-// Stub types — tauri-plugin-updater was removed; we do not auto-update the fork.
-// `check` always returns null so the UI's "check for update" button gracefully
-// reports "no update available" and the download/install code paths never run.
-// The shape mirrors the upstream `Update` type so the surrounding UI code
-// type-checks against the same field set.
+// tauri-plugin-updater is not registered in this fork (no auto-update).
+// The check below always returns null, so the update UI reports no update
+// and no download/install paths are reachable.
 
 export type CheckOptions = Record<string, unknown>
 
-// Mirrors @tauri-apps/plugin-updater Update. We never populate these, but the
-// UI reads `.available` / `.body` / calls `.downloadAndInstall(cb)` after a
-// successful check, so the stub must satisfy the same field contract.
 export type Update = {
   available: boolean
   version: string
   body?: string
   rawJson?: Record<string, unknown> | null
-  close?: () => Promise<void>
-  downloadAndInstall?: (onEvent?: (event: DownloadEvent) => void) => Promise<void>
+  close: () => Promise<void>
 }
 
 export type DownloadEvent =
@@ -29,104 +25,41 @@ export async function check(_options?: CheckOptions): Promise<Update | null> {
   return null
 }
 
-export type VersionParts = {
-  main: number[]
-  pre: (number | string)[]
-}
-
 const SEMVER_FULL_REGEX =
   /^\d+(?:\.\d+){1,2}(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
 const SEMVER_SEARCH_REGEX =
   /v?\d+(?:\.\d+){1,2}(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?/i
 
-export const normalizeVersion = (
-  input: string | null | undefined,
-): string | null => {
+const normalizeVersion = (input: string | null | undefined): string | null => {
   if (typeof input !== 'string') return null
   const trimmed = input.trim()
   if (!trimmed) return null
   return trimmed.replace(/^v/i, '')
 }
 
-export const ensureSemver = (
-  input: string | null | undefined,
-): string | null => {
+const ensureSemver = (input: string | null | undefined): string | null => {
   const normalized = normalizeVersion(input)
   if (!normalized) return null
   return SEMVER_FULL_REGEX.test(normalized) ? normalized : null
 }
 
-export const extractSemver = (
-  input: string | null | undefined,
-): string | null => {
+const extractSemver = (input: string | null | undefined): string | null => {
   if (typeof input !== 'string') return null
   const match = input.match(SEMVER_SEARCH_REGEX)
   if (!match) return null
   return normalizeVersion(match[0])
 }
 
-export const splitVersion = (version: string | null): VersionParts | null => {
-  if (!version) return null
-  const [mainPart, preRelease] = version.split('-')
-  const main = mainPart
-    .split('.')
-    .map((part) => Number.parseInt(part, 10))
-    .map((num) => (Number.isNaN(num) ? 0 : num))
-
-  const pre =
-    preRelease?.split('.').map((token) => {
-      const numeric = Number.parseInt(token, 10)
-      return Number.isNaN(numeric) ? token : numeric
-    }) ?? []
-
-  return { main, pre }
-}
-
-const compareVersionParts = (a: VersionParts, b: VersionParts): number => {
-  const length = Math.max(a.main.length, b.main.length)
-  for (let i = 0; i < length; i += 1) {
-    const diff = (a.main[i] ?? 0) - (b.main[i] ?? 0)
-    if (diff !== 0) return diff > 0 ? 1 : -1
+const compareVersions = (a: string | null, b: string | null): number | null => {
+  if (!a || !b) return null
+  try {
+    return compareSemver(a, b)
+  } catch {
+    return null
   }
-
-  if (a.pre.length === 0 && b.pre.length === 0) return 0
-  if (a.pre.length === 0) return 1
-  if (b.pre.length === 0) return -1
-
-  const preLen = Math.max(a.pre.length, b.pre.length)
-  for (let i = 0; i < preLen; i += 1) {
-    const aToken = a.pre[i]
-    const bToken = b.pre[i]
-    if (aToken === undefined) return -1
-    if (bToken === undefined) return 1
-
-    if (typeof aToken === 'number' && typeof bToken === 'number') {
-      if (aToken > bToken) return 1
-      if (aToken < bToken) return -1
-      continue
-    }
-
-    if (typeof aToken === 'number') return -1
-    if (typeof bToken === 'number') return 1
-
-    if (aToken > bToken) return 1
-    if (aToken < bToken) return -1
-  }
-
-  return 0
 }
 
-export const compareVersions = (
-  a: string | null,
-  b: string | null,
-): number | null => {
-  const partsA = splitVersion(a)
-  const partsB = splitVersion(b)
-  if (!partsA || !partsB) return null
-  return compareVersionParts(partsA, partsB)
-}
-
-export const resolveRemoteVersion = (update: Update): string | null => {
+const resolveRemoteVersion = (update: Update): string | null => {
   const primary = ensureSemver(update.version)
   if (primary) return primary
 
@@ -157,22 +90,25 @@ const localVersionNormalized = normalizeVersion(appVersion)
 export const checkUpdateSafe = async (
   options?: CheckOptions,
 ): Promise<Update | null> => {
-  const result = await check({ ...(options ?? {}), allowDowngrades: false })
+  const result = await check(options ?? {})
   if (!result) return null
 
   const remoteVersion = resolveRemoteVersion(result)
   const comparison = compareVersions(remoteVersion, localVersionNormalized)
 
-  if (comparison !== null && comparison <= 0) {
-    if (result.close) {
-      try {
-        await result.close()
-      } catch (err) {
-        console.warn('[updater] failed to close stale update resource', err)
-      }
+  const isBuildToStable =
+    /^\d+\.\d+\.\d+\+[0-9A-Za-z.-]+$/.test(localVersionNormalized ?? '') &&
+    remoteVersion === localVersionNormalized?.split('+')[0]
+
+  if (comparison !== null && comparison <= 0 && !isBuildToStable) {
+    try {
+      await result.close()
+    } catch (err) {
+      console.warn('[updater] failed to close stale update resource', err)
     }
     return null
   }
 
   return result
 }
+

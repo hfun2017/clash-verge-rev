@@ -1,6 +1,16 @@
+import { useCallback, useEffect, useRef } from 'react'
+
+import type { ProfilePatch, ProfileSelection } from '@/services/bindings'
 import { getProfiles, patchProfile, patchProfilesConfig } from '@/services/cmds'
-import { useQuery } from '@/services/query-client'
+import { mutate } from '@/services/mutate'
+import { migrateProfileTestUrls } from '@/services/proxy-test-url'
+import { fetchCacheData, setCacheData, useQuery } from '@/services/query-client'
 import { debugLog } from '@/utils/debug'
+
+const profilesQueryKey = ['getProfiles'] as const
+
+export const fetchProfilesIntoCache = () =>
+  fetchCacheData(profilesQueryKey, getProfiles)
 
 export const useProfiles = () => {
   const {
@@ -9,7 +19,7 @@ export const useProfiles = () => {
     error,
     isFetching: isValidating,
   } = useQuery({
-    queryKey: ['getProfiles'],
+    queryKey: profilesQueryKey,
     queryFn: async () => {
       const data = await getProfiles()
       debugLog(
@@ -26,46 +36,57 @@ export const useProfiles = () => {
     refetchInterval: false,
   })
 
-  const mutateProfiles = async () => {
-    await refetch()
-  }
+  useEffect(() => {
+    if (profiles) migrateProfileTestUrls(profiles)
+  }, [profiles])
 
-  const patchProfiles = async (
-    value: Partial<IProfilesConfig>,
-    signal?: AbortSignal,
-    options?: { deferRefreshOnSuccess?: boolean },
-  ) => {
-    try {
-      if (signal?.aborted) {
-        throw new DOMException('Operation was aborted', 'AbortError')
-      }
-      const success = await patchProfilesConfig(value)
+  const refetchRef = useRef(refetch)
+  refetchRef.current = refetch
+  const mutateProfiles = useCallback(async () => {
+    await refetchRef.current()
+  }, [])
 
-      if (signal?.aborted) {
-        throw new DOMException('Operation was aborted', 'AbortError')
-      }
+  const patchProfiles = useCallback(
+    async (value: ProfileSelection) => {
+      try {
+        const result = await mutate(() => patchProfilesConfig(value), {
+          id: 'patch-profiles-config',
+          errorNotice: false,
+          onFulfilled: (outcome) => {
+            if (outcome.status === 'valid') {
+              void setCacheData<IProfilesConfig>(profilesQueryKey, (current) =>
+                current ? { ...current, ...value } : current,
+              )
+            }
+          },
+        })
 
-      if (!options?.deferRefreshOnSuccess || !success) {
+        const outcome = result.value
+        if (outcome.status !== 'valid') {
+          await mutateProfiles()
+        }
+        return outcome
+      } catch (error) {
         await mutateProfiles()
-      }
-
-      return success
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
         throw error
       }
+    },
+    [mutateProfiles],
+  )
 
-      await mutateProfiles()
-      throw error
-    }
-  }
-
-  const patchCurrent = async (value: Partial<IProfileItem>) => {
-    if (profiles?.current) {
-      await patchProfile(profiles.current, value)
-      mutateProfiles()
-    }
-  }
+  const patchCurrent = useCallback(
+    async (value: ProfilePatch) => {
+      if (profiles?.current) {
+        const uid = profiles.current
+        await mutate(() => patchProfile(uid, value), {
+          id: `patch-profile:${uid}`,
+          errorNotice: false,
+        })
+        void mutateProfiles()
+      }
+    },
+    [mutateProfiles, profiles],
+  )
 
   return {
     profiles,

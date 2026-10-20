@@ -1,58 +1,42 @@
-import { useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
 import { LanguageRounded } from '@mui/icons-material'
-import { Box, Divider, MenuItem, Menu, styled, alpha } from '@mui/material'
-import { UnlistenFn } from '@tauri-apps/api/event'
+import { alpha, Box, Divider, Menu, MenuItem, styled } from '@mui/material'
 import { useLockFn } from 'ahooks'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BaseLoading } from '@/components/base'
 import { useIconCache } from '@/hooks/use-icon-cache'
-import { useListen } from '@/hooks/use-listen'
 import { cmdTestDelay } from '@/services/cmds'
 import delayManager from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
-import { debugLog } from '@/utils/debug'
+import { useTestAllCounter } from '@/store/app-store-context'
 
 import { TestBox } from './test-box'
 
 interface Props {
-  id: string
   itemData: IVergeTestItem
   onEdit: () => void
   onDelete: (uid: string) => void
 }
 
-export const TestItem = ({
-  id,
-  itemData,
-  onEdit,
-  onDelete: removeTest,
-}: Props) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
-    id,
-  })
-
+export const TestItem = ({ itemData, onEdit, onDelete: removeTest }: Props) => {
   const { t } = useTranslation()
   const [anchorEl, setAnchorEl] = useState<any>(null)
   const [position, setPosition] = useState({ left: 0, top: 0 })
   const [delay, setDelay] = useState(-1)
   const { uid, name, icon, url } = itemData
-  const iconCachePath = useIconCache({ icon, cacheKey: uid })
-  const { addListener } = useListen()
+  const iconCachePath = useIconCache({ icon: icon!, cacheKey: uid! })
 
   const onDelay = useCallback(async () => {
     setDelay(-2)
-    const result = await cmdTestDelay(url)
-    setDelay(result)
+    try {
+      const result = await cmdTestDelay(url!)
+      setDelay(result)
+    } catch (err) {
+      // A failed test must not leave the item stuck in the loading state.
+      setDelay(-1)
+      showNotice.error(err)
+    }
   }, [url])
 
   const onEditTest = () => {
@@ -63,50 +47,33 @@ export const TestItem = ({
   const onDelete = useLockFn(async () => {
     setAnchorEl(null)
     try {
-      removeTest(uid)
+      removeTest(uid!)
     } catch (err: any) {
       showNotice.error(err)
     }
   })
 
   const menu = [
-    { label: 'Edit', handler: onEditTest },
-    { label: 'Delete', handler: onDelete },
+    { label: t('shared.actions.edit'), handler: onEditTest },
+    { label: t('shared.actions.delete'), handler: onDelete },
   ]
 
+  // Store bump replaces the per-item event subscription; skip the initial
+  // mount value and call through a ref so url changes do not re-trigger tests.
+  const testAllCounter = useTestAllCounter()
+  const onDelayRef = useRef(onDelay)
+  onDelayRef.current = onDelay
+  const mountedRef = useRef(false)
   useEffect(() => {
-    let unlistenFn: UnlistenFn | null = null
-
-    const setupListener = async () => {
-      if (unlistenFn) {
-        unlistenFn()
-      }
-      unlistenFn = await addListener('verge://test-all', () => {
-        onDelay()
-      })
+    if (!mountedRef.current) {
+      mountedRef.current = true
+      return
     }
-
-    setupListener()
-
-    return () => {
-      if (unlistenFn) {
-        debugLog(
-          `TestItem for ${id} unmounting or url changed, cleaning up test-all listener.`,
-        )
-        unlistenFn()
-      }
-    }
-  }, [url, addListener, onDelay, id])
+    void onDelayRef.current()
+  }, [testAllCounter])
 
   return (
-    <Box
-      sx={{
-        position: 'relative',
-        transform: CSS.Transform.toString(transform),
-        transition,
-        zIndex: isDragging ? 'calc(infinity)' : undefined,
-      }}
-    >
+    <Box>
       <TestBox
         onContextMenu={(event) => {
           const { clientX, clientY } = event
@@ -115,26 +82,23 @@ export const TestItem = ({
           event.preventDefault()
         }}
       >
-        <Box
-          sx={{ position: 'relative', cursor: 'move' }}
-          ref={setNodeRef}
-          {...attributes}
-          {...listeners}
-        >
+        <Box data-sortable-handle sx={{ position: 'relative', cursor: 'move' }}>
           {icon && icon.trim() !== '' ? (
             <Box sx={{ display: 'flex', justifyContent: 'center' }}>
               {icon.trim().startsWith('http') && (
                 <img
+                  alt={name!}
                   src={iconCachePath === '' ? icon : iconCachePath}
                   height="40px"
                 />
               )}
               {icon.trim().startsWith('data') && (
-                <img src={icon} height="40px" />
+                <img alt={name!} src={icon!} height="40px" />
               )}
               {icon.trim().startsWith('<svg') && (
                 <img
-                  src={`data:image/svg+xml;base64,${btoa(icon)}`}
+                  alt={name!}
+                  src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(icon)}`}
                   height="40px"
                 />
               )}
@@ -220,7 +184,7 @@ export const TestItem = ({
             sx={{ minWidth: 120 }}
             dense
           >
-            {t(item.label)}
+            {item.label}
           </MenuItem>
         ))}
       </Menu>

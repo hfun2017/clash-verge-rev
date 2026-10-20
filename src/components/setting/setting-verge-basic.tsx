@@ -6,9 +6,10 @@ import { useTranslation } from 'react-i18next'
 
 import { DialogRef, TooltipIcon } from '@/components/base'
 import { useVerge } from '@/hooks/use-verge'
-import { navItems } from '@/pages/_routers'
+import { navigationItems } from '@/pages/_navigation-meta'
 import { copyClashEnv } from '@/services/cmds'
 import { supportedLanguages } from '@/services/i18n'
+import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
 import getSystem from '@/utils/get-system'
 
@@ -33,7 +34,7 @@ const languageOptions = supportedLanguages.map((code) => {
   const labels: { [key: string]: string } = {
     en: 'English',
     ru: 'Русский',
-    zh: '中文',
+    zh: '简体中文',
     fa: 'فارسی',
     tt: 'Татар',
     id: 'Bahasa Indonesia',
@@ -44,6 +45,7 @@ const languageOptions = supportedLanguages.map((code) => {
     es: 'Español',
     jp: '日本語',
     zhtw: '繁體中文',
+    pt: 'Português',
   }
   const label = labels[code] || code
   return { code, label }
@@ -74,8 +76,18 @@ const SettingVergeBasic = ({ onError }: Props) => {
   }
 
   const onCopyClashEnv = useCallback(async () => {
-    await copyClashEnv()
-    showNotice.success('shared.feedback.notifications.common.copySuccess', 1000)
+    try {
+      await mutate(copyClashEnv, {
+        id: 'copy-clash-env',
+        onFulfilled: () =>
+          showNotice.success(
+            'shared.feedback.notifications.common.copySuccess',
+            1000,
+          ),
+      })
+    } catch {
+      // The shared mutation boundary reports the failure.
+    }
   }, [])
 
   return (
@@ -187,7 +199,7 @@ const SettingVergeBasic = ({ onError }: Props) => {
           onGuard={(e) => patchVerge({ start_page: e })}
         >
           <Select size="small" sx={{ width: 140, '> div': { py: '7.5px' } }}>
-            {navItems.map((page: { label: string; path: string }) => {
+            {Object.values(navigationItems).map((page) => {
               return (
                 <MenuItem key={page.path} value={page.path}>
                   {t(page.label)}

@@ -10,6 +10,7 @@ import { MihomoWebSocket } from 'tauri-plugin-mihomo-api'
 
 import { BaseErrorBoundary } from './components/base'
 import { router } from './pages/_routers'
+import { preloadHomePageCards } from './pages/home'
 import { AppDataProvider } from './providers/app-data-provider'
 import { WindowProvider } from './providers/window'
 import { FALLBACK_LANGUAGE, initializeLanguage } from './services/i18n'
@@ -19,11 +20,8 @@ import {
   getPreloadConfig,
 } from './services/preload'
 import { swrConfig } from './services/query-client'
-import {
-  LoadingCacheProvider,
-  ThemeModeProvider,
-  UpdateStateProvider,
-} from './services/states'
+import { ThemeModeProvider, UpdateStateProvider } from './services/states'
+import { AppStoreProvider } from './store/app-store'
 import { disableWebViewShortcuts } from './utils/disable-webview-shortcuts'
 
 if (!window.ResizeObserver) {
@@ -42,7 +40,7 @@ disableWebViewShortcuts()
 const initializeApp = (initialThemeMode: 'light' | 'dark') => {
   const contexts = [
     <ThemeModeProvider key="theme" initialState={initialThemeMode} />,
-    <LoadingCacheProvider key="loading" />,
+    <AppStoreProvider key="app-store" />,
     <UpdateStateProvider key="update" />,
   ]
 
@@ -65,7 +63,10 @@ const initializeApp = (initialThemeMode: 'light' | 'dark') => {
 }
 
 const bootstrap = async () => {
-  const { initialThemeMode } = await preloadAppData()
+  const appDataPromise = preloadAppData()
+  void preloadHomePageCards()
+
+  const { initialThemeMode } = await appDataPromise
   initializeApp(initialThemeMode)
 }
 
