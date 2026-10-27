@@ -129,10 +129,7 @@ const ProfileItemBase = (props: ProfileItemProps) => {
 
   const fetchNextUpdateTimeCallback = useCallback(
     async (forceRefresh = false) => {
-      if (
-        itemData.option?.update_interval &&
-        itemData.option.update_interval > 0
-      ) {
+      if (itemData.option?.allow_auto_update !== false) {
         try {
           debugLog(`尝试获取配置 ${itemData.uid} 的下次更新时间`)
 
@@ -183,13 +180,18 @@ const ProfileItemBase = (props: ProfileItemProps) => {
           setNextUpdateTime(t('profiles.components.profileItem.status.unknown'))
         }
       } else {
-        debugLog(`该配置未设置更新间隔或间隔为0`)
+        debugLog(`该配置已关闭自动更新`)
         setNextUpdateTime(
           t('profiles.components.profileItem.status.autoUpdateDisabled'),
         )
       }
     },
-    [itemData.option?.update_interval, itemData.uid, t],
+    [
+      itemData.option?.allow_auto_update,
+      itemData.option?.update_interval,
+      itemData.uid,
+      t,
+    ],
   )
   const fetchNextUpdateTime = useLockFn(fetchNextUpdateTimeCallback)
 
@@ -214,6 +216,7 @@ const ProfileItemBase = (props: ProfileItemProps) => {
   }, [
     fetchNextUpdateTime,
     showNextUpdate,
+    itemData.option?.allow_auto_update,
     itemData.option?.update_interval,
     updated,
   ])

@@ -1,5 +1,6 @@
 use crate::{
-    config::{Config, PrfItem},
+    config::{Config, PrfItem, PrfOption},
+    constants,
     feat,
     process::AsyncHandler,
     singleton,
@@ -138,10 +139,10 @@ impl Timer {
 
         {
             let timer_map = self.timer_map.read();
-            logging!(debug, Type::Timer, "Registered timer task count: {}", timer_map.len());
+            logging!(info, Type::Timer, "Registered timer task count: {}", timer_map.len());
             for (uid, interval) in timer_map.iter() {
                 logging!(
-                    debug,
+                    info,
                     Type::Timer,
                     "Registered timer task: uid={}, interval={}min",
                     uid,
@@ -155,12 +156,13 @@ impl Timer {
         let cur_timestamp = chrono::Local::now().timestamp();
         if let Some(items) = Config::profiles().await.data_arc().items.as_ref() {
             for item in items.iter() {
-                if let Some(option) = item.option.as_ref()
-                    && option.allow_auto_update.unwrap_or(true)
-                    && let Some(interval) = option.update_interval
-                    && interval > 0
-                    && let Some(uid) = item.uid.as_ref()
-                    && let Some(updated) = item.updated
+                let (Some(uid), Some(option)) = (item.uid.as_ref(), item.option.as_ref()) else {
+                    continue;
+                };
+                let Some(interval) = Self::effective_interval(option) else {
+                    continue;
+                };
+                if let Some(updated) = item.updated
                     && cur_timestamp - (updated as i64) >= (interval as i64) * 60
                 {
                     logging!(info, Type::Timer, "Running overdue timer task immediately: uid={}", uid);
@@ -211,18 +213,31 @@ impl Timer {
         HashMap::new()
     }
 
+    /// An enabled auto-update without an explicit interval still schedules, at the enforced minimum.
+    fn effective_interval(option: &PrfOption) -> Option<u64> {
+        if !option.allow_auto_update.unwrap_or(true) {
+            return None;
+        }
+        Some(
+            option
+                .update_interval
+                .filter(|interval| *interval > 0)
+                .unwrap_or(constants::profile::MIN_UPDATE_INTERVAL),
+        )
+    }
+
     fn gen_map_from_items(items: &[PrfItem]) -> HashMap<String, TaskSchedule> {
         let now = chrono::Local::now().timestamp();
         let mut new_map = HashMap::new();
 
         for item in items {
-            if let Some(option) = item.option.as_ref()
-                && let (Some(interval), Some(uid)) = (option.update_interval, &item.uid)
-                && option.allow_auto_update.unwrap_or(true)
-                && interval > 0
-            {
-                new_map.insert(uid.clone(), TaskSchedule::new(interval, item.updated, now));
-            }
+            let (Some(uid), Some(option)) = (item.uid.as_ref(), item.option.as_ref()) else {
+                continue;
+            };
+            let Some(interval) = Self::effective_interval(option) else {
+                continue;
+            };
+            new_map.insert(uid.clone(), TaskSchedule::new(interval, item.updated, now));
         }
 
         new_map
@@ -543,7 +558,7 @@ mod tests {
     }
 
     #[test]
-    fn timer_map_only_contains_enabled_profiles_with_positive_intervals() {
+    fn timer_map_schedules_enabled_profiles_and_defaults_a_missing_interval() {
         let items = vec![
             remote_profile("enabled", Some(true), Some(30)),
             remote_profile("disabled", Some(false), Some(30)),
@@ -554,9 +569,18 @@ mod tests {
 
         let map = Timer::gen_map_from_items(&items);
 
-        assert_eq!(map.len(), 2);
+        // Auto-update enabled without an interval must still schedule at the enforced minimum;
+        // otherwise an imported profile silently never updates.
+        let minimum = crate::constants::profile::MIN_UPDATE_INTERVAL;
+        assert_eq!(map.len(), 4);
+        assert!(!map.contains_key("disabled"));
         assert_eq!(map.get("enabled").map(|s| s.interval_minutes), Some(30));
         assert_eq!(map.get("missing-flag").map(|s| s.interval_minutes), Some(30));
+        assert_eq!(map.get("zero-interval").map(|s| s.interval_minutes), Some(minimum));
+        assert_eq!(
+            map.get("missing-interval").map(|s| s.interval_minutes),
+            Some(minimum)
+        );
     }
 
     #[test]
