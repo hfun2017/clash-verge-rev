@@ -98,6 +98,7 @@ jobs:
             src-tauri/target/x86_64-pc-windows-msvc/release/NetHelper.exe
             src-tauri/target/x86_64-pc-windows-msvc/release/nethelper.exe
             target/x86_64-pc-windows-msvc/release/nethelper-mihomo*.exe
+            src-tauri/resources/nethelper-service*.exe
             tauri-build.stdout
             tauri-build.stderr
           if-no-files-found: error   # hard-fail if no .exe — never silently ship a "build that built nothing"
@@ -131,10 +132,13 @@ jobs:
           find target -name '*.exe' -exec cp -v {} . \;
           cp -v tauri-build.stdout tauri-build.log 2>/dev/null || true
           cp -v tauri-build.stderr tauri-build.log 2>/dev/null || true
+          # The service tools are resolved from <exe dir>/resources at runtime.
+          mkdir -p resources
+          cp -v src-tauri/resources/nethelper-service*.exe resources/
           ls -la
           echo "=== building zip ==="
           # Use 7z (zip on Ubuntu is sometimes missing the .exe extension support)
-          7z a -tzip NetHelper-windows-x64.zip NetHelper.exe nethelper-mihomo*.exe tauri-build.log 2>&1
+          7z a -tzip NetHelper-windows-x64.zip NetHelper.exe nethelper-mihomo*.exe resources tauri-build.log 2>&1
           ls -la NetHelper-windows-x64.zip
           echo "=== Zip contents (verify) ==="
           unzip -l NetHelper-windows-x64.zip 2>&1 || 7z l NetHelper-windows-x64.zip 2>&1
@@ -154,8 +158,11 @@ jobs:
             | `NetHelper.exe` | **GUI 主程序,双击运行** |
             | `nethelper-mihomo.exe` | 改名后的 Mihomo 稳定内核 (Tauri sidecar) |
             | `nethelper-mihomo-alpha.exe` | 改名后的 Mihomo 测试内核 (设置里可切换) |
+            | `resources/nethelper-service.exe` | 系统服务本体 (TUN 模式用) |
+            | `resources/nethelper-service-install.exe` | 服务安装器 (TUN 模式用) |
+            | `resources/nethelper-service-uninstall.exe` | 服务卸载器 |
 
-            **重要**: 三个文件**必须放在同一目录**,不要拆开.
+            **重要**: `NetHelper.exe`、两个内核 exe 和整个 `resources/` 目录**必须保持原有相对位置**,不要拆开;缺少 `resources/` 时 TUN 模式会报"找不到服务安装器".
 
             ## 怎么用
 
@@ -180,7 +187,7 @@ jobs:
             - GUI: `clash-verge-rev` → `NetHelper` (产品名 / 窗口标题 / HTML title / app ID)
             - 内核: `verge-mihomo` → `nethelper-mihomo` (stable + alpha 两个版本都改)
             - IPC 管道: `verge-mihomo` → `nethelper`
-            - 服务辅助进程: `clash-verge-service.exe` → `nethelper-service.exe`
+            - 服务辅助进程: `clash-verge-service.exe` → `nethelper-service.exe` (注册名 `nethelper_service`)
 
             i18n 翻译文件里有几十处 "Clash Verge" 文案是**故意保留的** (app 内部 UI 文案,跟进程名/窗口名无关),详细见 [README](https://github.com/hfun2017/clash-verge-rev#readme).
 

@@ -546,18 +546,17 @@ const resolveServicePermission = async () => {
 
 // Other resources
 const SERVICE_BINARIES = [
-  'clash-verge-service',
-  'clash-verge-service-install',
-  'clash-verge-service-uninstall',
+  'nethelper-service',
+  'nethelper-service-install',
+  'nethelper-service-uninstall',
 ]
 
 function serviceFileInfo(name) {
   const ext = platform === 'win32' ? '.exe' : ''
   const suffix = platform === 'linux' ? `-${SIDECAR_HOST}` : ''
-  const targetName = name.replace(/^clash-verge-service/, 'nethelper-service')
   return {
     sourceFile: `${name}${ext}`,
-    targetFile: `${targetName}${suffix}${ext}`,
+    targetFile: `${name}${suffix}${ext}`,
   }
 }
 

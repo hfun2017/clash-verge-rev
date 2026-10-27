@@ -8,7 +8,8 @@ export const developmentServiceDirectoryEnvironment =
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const serviceRepository = resolve(
   repositoryRoot,
-  '..',
+  'src-tauri',
+  'vendor',
   'clash-verge-service-ipc',
 )
 const serviceManifest = join(serviceRepository, 'Cargo.toml')
@@ -78,9 +79,9 @@ export async function prepareDevelopmentService() {
     }
   }
   const executables = [
-    'clash-verge-service',
-    'clash-verge-service-install',
-    'clash-verge-service-uninstall',
+    'nethelper-service',
+    'nethelper-service-install',
+    'nethelper-service-uninstall',
     'service-integration-driver',
   ].map((name) => {
     const executable = artifacts.get(name)
@@ -107,7 +108,7 @@ export async function ensureDevelopmentService({
   const extension = platform === 'win32' ? '.exe' : ''
   const installer = join(
     serviceDirectory,
-    `clash-verge-service-install${extension}`,
+    `nethelper-service-install${extension}`,
   )
   const host = execFileSync('rustc', ['-vV'], { encoding: 'utf8' }).match(
     /^host: (.+)$/m,
